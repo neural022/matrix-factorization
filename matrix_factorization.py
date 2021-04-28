@@ -2,6 +2,29 @@
 import numpy as np
 import sys
 
+
+class AdamOptim():
+    def __init__(self, w_size, eta=0.01, beta1=0.9, beta2=0.999, epsilon=1e-8):
+        # parameters
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = epsilon
+        self.lr = eta 
+        self.w_size = w_size
+        # Momentum and RMSProp initial
+        # m_dw: Momentum for weight's gradient 
+        # v_dw: RMSProp for weight's gradient
+        self.m_dw, self.v_dw = np.zeros(self.w_size), np.zeros(self.w_size)
+            
+    def step(self, parms, grad, t):
+        ''' weights '''
+        self.m_dw = self.beta1 * self.m_dw + (1-self.beta1) * grad
+        self.v_dw = self.beta2 * self.v_dw + (1-self.beta2) * np.square(grad)
+        self.m_dw /= (1-self.beta1**t)
+        self.v_dw /= (1-self.beta2**t)
+        parms += self.lr * self.m_dw / (np.sqrt(self.v_dw) + self.epsilon)
+        return parms
+
 class MatrixFactorization:
     def __init__(self, U_size, V_size, W, epoch, lr, max_patience, numpy_version=True):        
         # parameters
@@ -25,13 +48,20 @@ class MatrixFactorization:
         # E: error
         self.E = np.subtract(target_matrix, real_matrix)
         return np.sum(np.square(self.E))
-        
-    def _backward(self):
+    
+    def _backward(self, t):
         # alpha: learning_rate
         # dU = -alpha* E*V.T, U_new = U_old + dU
         # dV = -alpha* U.T*E, V_new = V_old + dV 
-        self.U += self.lr * np.dot(self.E, self.V.T)
-        self.V += self.lr * np.dot(self.U.T, self.E)
+        
+        # GD (gradient descent)
+        # self.U += self.lr * np.dot(self.E, self.V.T)
+        # self.V += self.lr * np.dot(self.U.T, self.E)
+        
+        # Adam (adaptive momentum estimation) = Momentum + RMSProp
+        # t: time step
+        self.U = self.adam_U.step(self.U, np.dot(self.E, self.V.T), t)
+        self.V = self.adam_V.step(self.V, np.dot(self.U.T, self.E), t)
         
     def train(self):
         # early stopping parameters
@@ -39,6 +69,11 @@ class MatrixFactorization:
         last_loss = 0
         
         for e in range(self.epoch):
+        
+            ''' Optimizer '''
+            self.adam_U = AdamOptim(self.U.shape, eta=self.lr)
+            self.adam_V = AdamOptim(self.V.shape, eta=self.lr)
+            
             ''' forward '''
             # outputs: ^W, real value
             # inner product: Y = f(Wx)
@@ -52,7 +87,7 @@ class MatrixFactorization:
             
             ''' backward '''
             # update parameters with gradient descent
-            self._backward()
+            self._backward(e+1)
             
             ''' early stopping '''
             if last_loss and loss > last_loss:
@@ -69,8 +104,8 @@ if __name__ == '__main__':
 
     # np.random.seed(42)
     ''' train setting '''
-    epoch = 1000
-    learning_rate = 3e-2
+    epoch = 300
+    learning_rate = 1e-2
     max_patience = 1
     
     # W ~= U*V

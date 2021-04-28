@@ -1,13 +1,14 @@
-var eps = 0.03;
+var eps = 0.02;
 
 matrixFactorization();
 
-function matrixFactorization(numEpochs=3000,debugCount=1) {
+function matrixFactorization(numEpochs=1000,debugCount=1) {
   let W = [ [1, 3, 5, -2], 
 			[2, 4, -3, -1], 
 			[-1, 6, 3, -5] ]; // W:3x4
             
   let U = createVectors(3, 5), V = createVectors(5,4); //U:3x5,V:5x4
+  let lastU = 0, lastV = 0;
   let patience = 0, lastLoss = 0;
   
   for(let epoch = 1; epoch <=numEpochs; epoch++) {
@@ -18,8 +19,9 @@ function matrixFactorization(numEpochs=3000,debugCount=1) {
     console.log('epoch: ' + epoch + ' loss = ' + loss);
 
     //  backward
-    update(U, multiply(E, transpose(V)));	//  U:3x5 E*V.T:3x5
-    update(V, multiply(transpose(U), E));	//  V:5x4 U.T*E:5x4
+	update(U, multiply(E, transpose(V)), lastU);	//  U:3x5 E*V.T:3x5
+	update(V, multiply(transpose(U), E), lastV);	//  V:5x4 U.T*E:5x4
+	
 		
     // early stopping
     if(lastLoss && loss > lastLoss) {
@@ -31,6 +33,9 @@ function matrixFactorization(numEpochs=3000,debugCount=1) {
     }
     else patience = 0;
     lastLoss = loss;
+    //	square error changes
+	lastU = multiply(E, transpose(V));
+  	lastV = multiply(transpose(U), E);
   }
   display(U, 'U')
   display(V, 'V')
@@ -45,6 +50,7 @@ function display(M, id) {
     console.log(arr.map(v=>(''+v).substring(0,8)).reduce((a,b)=>a+'\t'+b))
   })
 }
+
 function update(U, _U, __U) {
   for(let i = 0; i < U.length; i++) {
     for(let j = 0; j < U[i].length; j++) {
@@ -53,6 +59,7 @@ function update(U, _U, __U) {
     }
   }
 }
+
 function norm2(E) {
   let sum = 0;
   for(let i = 0; i < E.length; i++) {
@@ -62,6 +69,7 @@ function norm2(E) {
   }
   return sum;
 }
+
 function multiply(A, B) {
   let C = new Array(A.length);
   for(let i = 0; i < C.length; i++) C[i]=new Array(B[0].length).fill(0);
@@ -72,6 +80,7 @@ function multiply(A, B) {
   }
   return C;
 }
+
 function substract(A,B) {
 
   let C = new Array(A.length);
